@@ -148,7 +148,7 @@ class GearmanTaskServer(object):
                 except Empty:
                     r = None
                 if r is not None:
-                    if isinstance(r, gearman.errors.ServerUnavailable):
+                    if isinstance(r, gearman.errors.ServerUnavailable) or isinstance(r, gearman.errors.ConnectionError):
                         #: @todo non-blocking doneq.get() to clear it out of
                         #        similar errors? or maybe just reset doneq above
                         #        when len(workers)==0
@@ -216,7 +216,11 @@ def _worker_process(tasks, doneq, host_list, worker_class=None, client_id=None, 
                     log.info("Registering {0} task {1}".format(client_id, taskname))
                 gm_worker.register_task(taskname, callback)
             # Enter the work loop
-            gm_worker.work()
+            try:
+                gm_worker.work()
+            except gearman.errors.ConnectionError, e:
+                doneq.put(e)
+                return 
         except gearman.errors.ServerUnavailable, e:
             doneq.put(e)
             return
